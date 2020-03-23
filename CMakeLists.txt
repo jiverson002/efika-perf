@@ -1,22 +1,9 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 
 #-------------------------------------------------------------------------------
-# BOOTSTRAP w/ latest bootstrap/cmake scripts
+# BOOTSTRAP
 #-------------------------------------------------------------------------------
-include(FetchContent)
-FetchContent_Declare(cmake
-  GIT_REPOSITORY git@github.com:jiverson002/bootstrap-cmake.git
-)
-FetchContent_MakeAvailable(cmake)
-
-#-------------------------------------------------------------------------------
-# Import dependencies
-#-------------------------------------------------------------------------------
-set(core_GIT_REPOSITORY git@github.com:jiverson002/efika-core.git)
-set(data_GIT_REPOSITORY git@github.com:jiverson002/efika-data.git)
-set(impl_GIT_REPOSITORY git@github.com:jiverson002/efika-impl.git)
-
-import(core data impl)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/Bootstrap.cmake)
 
 #-------------------------------------------------------------------------------
 # SUBPROJECT configuration
@@ -33,13 +20,9 @@ cxx_17()
 #-------------------------------------------------------------------------------
 # ...
 #-------------------------------------------------------------------------------
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-  include(BSBench)
-endif()
+include(BSBench)
 
 #-------------------------------------------------------------------------------
 # ...
 #-------------------------------------------------------------------------------
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_BENCHMARKING)
-  add_subdirectory(src)
-endif()
+add_subdirectory(src)
