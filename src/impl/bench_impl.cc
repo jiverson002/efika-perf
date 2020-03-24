@@ -8,21 +8,21 @@
 
 #include "celero/Celero.h"
 
-#include "efika/data/path.h"
-#include "efika/impl/sfr.h"
+#include "efika/data.h"
+#include "efika/impl.h"
 
 namespace impl {
 
 struct sfr1d {
   void operator()(Problem const P, Vector * const A) {
-    ::sfr1d(P, A);
+    EFIKA_Impl_sfr1d(P, A);
   }
 };
 
 #ifdef HAS_SFRKD
 struct sfrkd {
   void operator()(Problem const P, Vector * const A) {
-    ::sfrkd(P, A);
+    EFIKA_Impl_sfrkd(P, A);
   }
 };
 #endif
@@ -56,10 +56,10 @@ class TestFixture : public celero::TestFixture {
   public:
     TestFixture() {
       if (!E.size()) {
-        auto ndatasets = sizeof(datasets)/sizeof(*datasets);
+        auto ndatasets = sizeof(EFIKA_datasets)/sizeof(*EFIKA_datasets);
         std::cout << "Prob. Space:" << std::endl;
         for(decltype(ndatasets) i = 0; i < ndatasets; i++) {
-          auto const &filename = std::string(EFIKA_DATA_PATH) + "/" + datasets[i];
+          auto const &filename = std::string(EFIKA_DATA_PATH) + "/" + EFIKA_datasets[i];
           std::cout << "  " << i << ": " << "{ t: 0.10, filename: \"" << filename << "\" }" << std::endl;
           E.push_back({ 0.10, filename });
         }
