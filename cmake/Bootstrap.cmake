@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-# BOOTSTRAP w/ latest bootstrap/cmake scripts
+# ...
 #-------------------------------------------------------------------------------
 if(${CMAKE_VERSION} VERSION_LESS "3.14.0")
   macro(FetchContent_MakeAvailable name)
@@ -11,12 +11,16 @@ if(${CMAKE_VERSION} VERSION_LESS "3.14.0")
   endmacro()
 endif()
 
-set(BS_CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_DIR})
-
+#-------------------------------------------------------------------------------
+# BOOTSTRAP w/ latest bootstrap/cmake scripts
+#-------------------------------------------------------------------------------
 include(FetchContent)
 FetchContent_Declare(bootstrap
   GIT_REPOSITORY git@github.com:jiverson002/bootstrap-cmake.git
 )
 FetchContent_MakeAvailable(bootstrap)
 
-unset(BS_CURRENT_LIST_DIR)
+#-------------------------------------------------------------------------------
+# Include project dependencies
+#-------------------------------------------------------------------------------
+Bootstrap_dependency_file(${CMAKE_CURRENT_LIST_DIR}/Dependencies.cmake)

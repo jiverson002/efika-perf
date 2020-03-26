@@ -1,0 +1,3 @@
+# ...
+add_library( efika-perf-data INTERFACE )
+add_library( EfikaPerf::data ALIAS efika-perf-data )
