@@ -1,44 +1,53 @@
-cmake_minimum_required( VERSION 3.13 )
+cmake_minimum_required(VERSION 3.14)
 
 # Subproject of efika
-project( efika-perf )
+project(efika-perf)
 
-# Always use '-fPIC'/'-fPIE' option.
-set( CMAKE_POSITION_INDEPENDENT_CODE ON )
+# Include build configurations (compiler standards, options, etc.)
+if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND EFIKA_BUILDCONFIG_FILE)
+  include(${EFIKA_BUILDCONFIG_FILE})
+endif()
 
-# Require C++17 compliance from compiler
-set( CMAKE_CXX_STANDARD 17 )
-set( CMAKE_CXX_STANDARD_REQUIRED ON )
-set( CMAKE_CXX_EXTENSIONS OFF )
-
-#-------------------------------------------------------------------------------
-# Celero configuration
-#-------------------------------------------------------------------------------
-include( FetchContent )
-
-FetchContent_Declare( Celero
-  GIT_REPOSITORY https://github.com/DigitalInBlue/Celero.git )
-
-FetchContent_MakeAvailable( Celero )
+# Include required CMake modules
+include(FetchContent)
 
 #-------------------------------------------------------------------------------
 # EXECUTABLE configuration
 #-------------------------------------------------------------------------------
-add_executable( ${PROJECT_NAME} )
-target_sources( ${PROJECT_NAME} PRIVATE src/bench_main.cc )
-target_link_libraries( ${PROJECT_NAME} PRIVATE celero )
+add_executable(${PROJECT_NAME})
+
+target_sources(${PROJECT_NAME} PRIVATE src/bench_main.cc)
+
+#-------------------------------------------------------------------------------
+# Celero configuration
+#-------------------------------------------------------------------------------
+FetchContent_Declare(Celero
+  GIT_REPOSITORY https://github.com/DigitalInBlue/Celero.git)
+
+FetchContent_MakeAvailable(Celero)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE celero)
 
 #-------------------------------------------------------------------------------
 # Declare efika dependencies
 #-------------------------------------------------------------------------------
-foreach( dep data impl )
-  FetchContent_Declare( efika-${dep}
-    GIT_REPOSITORY git@github.com:jiverson002/efika-${dep}.git )
+# Efika::data
+FetchContent_Declare(efika-data
+  GIT_REPOSITORY git@github.com:jiverson002/efika-data.git)
 
-  FetchContent_MakeAvailable( efika-${dep} )
+FetchContent_MakeAvailable(efika-data)
 
-  target_link_libraries( ${PROJECT_NAME}
-    PUBLIC Efika::${dep} EfikaPerf::${dep} )
+# Efika::efika
+find_package(Efika CONFIG REQUIRED)
 
-  add_subdirectory( src/${dep} )
+target_link_libraries(${PROJECT_NAME}
+  PRIVATE Efika::data Efika::efika)
+
+#-------------------------------------------------------------------------------
+# Add benchmarks to executable
+#-------------------------------------------------------------------------------
+foreach(bench impl)
+  add_subdirectory(src/${bench})
+
+  target_link_libraries(${PROJECT_NAME} PRIVATE EfikaPerf::${bench})
 endforeach()

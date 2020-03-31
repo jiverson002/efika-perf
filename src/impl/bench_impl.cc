@@ -112,7 +112,7 @@ class TestFixture : public celero::TestFixture {
       delete [] P.mem;
     }
 
-    void run() {
+    void TestBody() {
       Impl()(P, &A);
       celero::DoNotOptimizeAway(A.size);
     }
@@ -121,8 +121,8 @@ class TestFixture : public celero::TestFixture {
 } // namespace
 
 #ifdef HAS_SFR1D
-BASELINE_F (impl, sfr1d, TestFixture<impl::sfr1d>, 2, 2) { run(); }
+BASELINE_F (impl, sfr1d, TestFixture<impl::sfr1d>, 2, 2) { TestBody(); }
 #endif
 #ifdef HAS_SFRKD
-BENCHMARK_F(impl, sfrkd, TestFixture<impl::sfrkd>, 5, 5) { run(); }
+BENCHMARK_F(impl, sfrkd, TestFixture<impl::sfrkd>, 5, 5) { TestBody(); }
 #endif
