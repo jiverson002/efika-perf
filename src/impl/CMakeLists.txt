@@ -30,6 +30,6 @@ target_compile_definitions(${PROJECT_NAME}
   PRIVATE $<${HAS_SFR1D}:HAS_SFR1D> $<${HAS_SFRKD}:HAS_SFRKD>)
 
 target_link_libraries(${PROJECT_NAME}
-  PRIVATE celero Efika::data Efika::efika)
+  PRIVATE Celero::celero Efika::data Efika::efika)
 
 add_library(EfikaPerf::impl ALIAS ${PROJECT_NAME})

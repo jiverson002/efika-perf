@@ -19,18 +19,11 @@ add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE src/bench_main.cc)
 
 #-------------------------------------------------------------------------------
-# Celero configuration
+# DEPENDENCY configuration
 #-------------------------------------------------------------------------------
-FetchContent_Declare(Celero
-  GIT_REPOSITORY https://github.com/DigitalInBlue/Celero.git)
+# Celero::celero
+find_package(Celero CONFIG REQUIRED)
 
-FetchContent_MakeAvailable(Celero)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE celero)
-
-#-------------------------------------------------------------------------------
-# Declare efika dependencies
-#-------------------------------------------------------------------------------
 # Efika::data
 FetchContent_Declare(efika-data
   GIT_REPOSITORY git@github.com:jiverson002/efika-data.git)
@@ -41,10 +34,10 @@ FetchContent_MakeAvailable(efika-data)
 find_package(Efika CONFIG REQUIRED)
 
 target_link_libraries(${PROJECT_NAME}
-  PRIVATE Efika::data Efika::efika)
+  PRIVATE Celero::celero Efika::data Efika::efika)
 
 #-------------------------------------------------------------------------------
-# Add benchmarks to executable
+# BENCHMARKS configuration
 #-------------------------------------------------------------------------------
 foreach(bench impl)
   add_subdirectory(src/${bench})
