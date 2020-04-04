@@ -5,7 +5,9 @@ project(efika-perf)
 
 # Include build configurations (compiler standards, options, etc.)
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND EFIKA_BUILDCONFIG_FILE)
-  include(${EFIKA_BUILDCONFIG_FILE})
+  foreach(file ${EFIKA_BUILDCONFIG_FILE})
+    include(${file})
+  endforeach()
 endif()
 
 # Include required CMake modules
@@ -33,8 +35,7 @@ FetchContent_MakeAvailable(efika-data)
 # Efika::efika
 find_package(Efika CONFIG REQUIRED)
 
-target_link_libraries(${PROJECT_NAME}
-  PRIVATE Celero::celero Efika::data Efika::efika)
+target_link_libraries(${PROJECT_NAME} PRIVATE Celero::celero)
 
 #-------------------------------------------------------------------------------
 # BENCHMARKS configuration

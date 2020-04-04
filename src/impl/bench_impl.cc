@@ -8,21 +8,25 @@
 
 #include "celero/Celero.h"
 
+#include "efika/core.h"
 #include "efika/data.h"
 #include "efika/impl.h"
+#include "efika/io.h"
 
 namespace impl {
 
 struct sfr1d {
-  void operator()(Problem const P, Vector * const A) {
-    EFIKA_Impl_sfr1d(P, A);
+  int operator()(EFIKA_val_t const minsim, EFIKA_Matrix const * const M,
+                 EFIKA_Matrix const * const I, Vector * const A) {
+    return EFIKA_Impl_sfr1d(minsim, M, I, A);
   }
 };
 
 #ifdef HAS_SFRKD
 struct sfrkd {
-  void operator()(Problem const P, Vector * const A) {
-    EFIKA_Impl_sfrkd(P, A);
+  int operator()(EFIKA_val_t const minsim, EFIKA_Matrix const * const M,
+                 EFIKA_Matrix const * const I, Vector * const A) {
+    return EFIKA_Impl_sfrkd(minsim, M, I, A);
   }
 };
 #endif
@@ -50,8 +54,10 @@ static std::vector<Experiment> E;
 template <typename Impl>
 class TestFixture : public celero::TestFixture {
   private:
-    Problem P;
-    Vector A;
+    EFIKA_val_t minsim_;
+    EFIKA_Matrix M_;
+    EFIKA_Matrix I_;
+    Vector A_;
 
   public:
     TestFixture() {
@@ -78,43 +84,53 @@ class TestFixture : public celero::TestFixture {
 
     virtual void
     setUp(const celero::TestFixture::ExperimentValue& ex) override {
-      unsigned n, k;
+      int err;
 
       const auto& [ t, filename ] = E[ex.Value];
 
-      std::ifstream file(filename);
-      if (!file.is_open())
+      minsim_ = t;
+
+      err = EFIKA_Matrix_init(&M_);
+      if (err)
+        throw std::runtime_error("Could not initialize matrix");
+      err = EFIKA_Matrix_init(&I_);
+      if (err)
+        throw std::runtime_error("Could not initialize matrix");
+
+      FILE * fp = fopen(filename.c_str(), "r");
+      if (!fp)
         throw std::invalid_argument("Cannot open `" + filename + "' for reading");
 
-      file >> n >> k;
-      if (file.fail())
-        throw std::invalid_argument("Cannot read `" + filename);
+      err = EFIKA_IO_cluto_load(fp, &M_);
+      if (err)
+        throw std::runtime_error("Could not load `" + filename + "'");
 
-      auto const mem = new float[n][5];
-      if (!mem)
-        throw std::bad_alloc();
+      fclose(fp);
 
-      for (unsigned i = 0; i < n; i++) {
-        for (unsigned j = 0; j < k; j++) {
-          file >> mem[i][j];
-          if (file.fail())
-            throw std::invalid_argument("Cannot read `" + filename);
-        }
-      }
+      err = EFIKA_Matrix_sort(&M_, EFIKA_ASC | EFIKA_COL);
+      if (err)
+        throw std::runtime_error("Could not sort matrix");
 
-      P = { t, k, n, mem };
+      err = EFIKA_Matrix_iidx(&M_, &I_);
+      if (err)
+        throw std::runtime_error("Could not transpose matrix");
 
-      A = vector_new();
+      err = EFIKA_Matrix_sort(&I_, EFIKA_ASC | EFIKA_VAL);
+      if (err)
+        throw std::runtime_error("Could not sort matrix");
+
+      A_ = vector_new();
     }
 
     virtual void tearDown() override {
-      vector_delete(&A);
-      delete [] P.mem;
+      EFIKA_Matrix_free(&M_);
+      EFIKA_Matrix_free(&I_);
+      vector_delete(&A_);
     }
 
     void TestBody() {
-      Impl()(P, &A);
-      celero::DoNotOptimizeAway(A.size);
+      Impl()(minsim_, &M_, &I_, &A_);
+      celero::DoNotOptimizeAway(A_.size);
     }
 };
 
