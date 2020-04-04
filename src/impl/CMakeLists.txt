@@ -10,10 +10,10 @@ get_target_property(CMAKE_REQUIRED_INCLUDES
   Efika::efika INTERFACE_INCLUDE_DIRECTORIES)
 
 check_prototype_definition(EFIKA_Impl_sfr1d
-  "void EFIKA_Impl_sfr1d(Problem P, Vector * const A)" "\;"
+  "int EFIKA_Impl_sfr1d(EFIKA_val_t const minsim, EFIKA_Matrix const * const M, EFIKA_Matrix const * const I, Vector * const A)" "0"
   "efika/impl.h" HAS_SFR1D)
 check_prototype_definition(EFIKA_Impl_sfrkd
-  "void EFIKA_Impl_sfrkd(Problem P, Vector * const A)" "\;"
+  "int EFIKA_Impl_sfrkd(EFIKA_val_t const minsim, EFIKA_Matrix const * const M, EFIKA_Matrix const * const I, Vector * const A)" "0"
   "efika/impl.h" HAS_SFRKD)
 
 if(NOT HAS_SFR1D)
