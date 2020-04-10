@@ -15,12 +15,15 @@
 
 namespace impl {
 
-struct sfr1d {
+#ifdef HAS_SFR0D
+struct sfr0d {
   int operator()(EFIKA_val_t const minsim, EFIKA_Matrix const * const M,
                  EFIKA_Matrix const * const I, Vector * const A) {
-    return EFIKA_Impl_sfr1d(minsim, M, I, A);
+    return EFIKA_Impl_sfr0d(minsim, M, A);
+    (void)I;
   }
 };
+#endif
 
 #ifdef HAS_SFRKD
 struct sfrkd {
@@ -93,9 +96,6 @@ class TestFixture : public celero::TestFixture {
       err = EFIKA_Matrix_init(&M_);
       if (err)
         throw std::runtime_error("Could not initialize matrix");
-      err = EFIKA_Matrix_init(&I_);
-      if (err)
-        throw std::runtime_error("Could not initialize matrix");
 
       FILE * fp = fopen(filename.c_str(), "r");
       if (!fp)
@@ -107,9 +107,21 @@ class TestFixture : public celero::TestFixture {
 
       fclose(fp);
 
+      err = EFIKA_Matrix_comp(&M_);
+      if (err)
+        throw std::runtime_error("Could not compact matrix");
+
+      err = EFIKA_Matrix_norm(&M_);
+      if (err)
+        throw std::runtime_error("Could not normalize matrix");
+
       err = EFIKA_Matrix_sort(&M_, EFIKA_ASC | EFIKA_COL);
       if (err)
         throw std::runtime_error("Could not sort matrix");
+
+      err = EFIKA_Matrix_init(&I_);
+      if (err)
+        throw std::runtime_error("Could not initialize matrix");
 
       err = EFIKA_Matrix_iidx(&M_, &I_);
       if (err)
@@ -136,8 +148,8 @@ class TestFixture : public celero::TestFixture {
 
 } // namespace
 
-#ifdef HAS_SFR1D
-BASELINE_F (impl, sfr1d, TestFixture<impl::sfr1d>, 2, 2) { TestBody(); }
+#ifdef HAS_SFR0D
+BASELINE_F (impl, sfr1d, TestFixture<impl::sfr0d>, 2, 2) { TestBody(); }
 #endif
 #ifdef HAS_SFRKD
 BENCHMARK_F(impl, sfrkd, TestFixture<impl::sfrkd>, 5, 5) { TestBody(); }
