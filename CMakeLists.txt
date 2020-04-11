@@ -40,7 +40,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Celero::celero)
 #-------------------------------------------------------------------------------
 # BENCHMARKS configuration
 #-------------------------------------------------------------------------------
-foreach(bench impl)
+foreach(bench apss)
   add_subdirectory(src/${bench})
 
   target_link_libraries(${PROJECT_NAME} PRIVATE EfikaPerf::${bench})

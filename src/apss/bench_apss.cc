@@ -8,19 +8,22 @@
 
 #include "celero/Celero.h"
 
+#include "efika/apss.h"
 #include "efika/core.h"
 #include "efika/data.h"
-#include "efika/impl.h"
 #include "efika/io.h"
 
-namespace impl {
+namespace apss {
 
-#ifdef HAS_SFR0D
-struct sfr0d {
+#ifdef HAS_BRUTEFORCE
+struct bruteforce {
   int operator()(EFIKA_val_t const minsim, EFIKA_Matrix const * const M,
-                 EFIKA_Matrix const * const I, Vector * const A) {
-    return EFIKA_Impl_sfr0d(minsim, M, A);
+                 EFIKA_Matrix const * const I, EFIKA_Matrix * const S,
+                 Vector * const A)
+  {
+    return EFIKA_apss_bruteforce(minsim, M, S);
     (void)I;
+    (void)A;
   }
 };
 #endif
@@ -28,13 +31,16 @@ struct sfr0d {
 #ifdef HAS_SFRKD
 struct sfrkd {
   int operator()(EFIKA_val_t const minsim, EFIKA_Matrix const * const M,
-                 EFIKA_Matrix const * const I, Vector * const A) {
-    return EFIKA_Impl_sfrkd(minsim, M, I, A);
+                 EFIKA_Matrix const * const I, EFIKA_Matrix * const S,
+                 Vector * const A)
+  {
+    return EFIKA_apss_sfrkd(minsim, M, I, A);
+    (void)S;
   }
 };
 #endif
 
-} // impl
+} // apss
 
 namespace {
 
@@ -54,12 +60,13 @@ class Experiment {
 
 static std::vector<Experiment> E;
 
-template <typename Impl>
+template <typename apss>
 class TestFixture : public celero::TestFixture {
   private:
     EFIKA_val_t minsim_;
     EFIKA_Matrix M_;
     EFIKA_Matrix I_;
+    EFIKA_Matrix S_;
     Vector A_;
 
   public:
@@ -131,26 +138,31 @@ class TestFixture : public celero::TestFixture {
       if (err)
         throw std::runtime_error("Could not sort matrix");
 
+      err = EFIKA_Matrix_init(&S_);
+      if (err)
+        throw std::runtime_error("Could not initialize solution matrix");
+
       A_ = vector_new();
     }
 
     virtual void tearDown() override {
       EFIKA_Matrix_free(&M_);
       EFIKA_Matrix_free(&I_);
+      EFIKA_Matrix_free(&S_);
       vector_delete(&A_);
     }
 
     void TestBody() {
-      Impl()(minsim_, &M_, &I_, &A_);
+      apss()(minsim_, &M_, &I_, &S_, &A_);
       celero::DoNotOptimizeAway(A_.size);
     }
 };
 
 } // namespace
 
-#ifdef HAS_SFR0D
-BASELINE_F (impl, sfr1d, TestFixture<impl::sfr0d>, 2, 2) { TestBody(); }
+#ifdef HAS_BRUTEFORCE
+BASELINE_F(apss, bruteforce, TestFixture<apss::bruteforce>, 2, 2) { TestBody(); }
 #endif
 #ifdef HAS_SFRKD
-BENCHMARK_F(impl, sfrkd, TestFixture<impl::sfrkd>, 5, 5) { TestBody(); }
+//BENCHMARK_F(apss, sfrkd, TestFixture<apss::sfrkd>, 5, 5) { TestBody(); }
 #endif
