@@ -10,13 +10,25 @@ get_target_property(CMAKE_REQUIRED_INCLUDES
   Efika::efika INTERFACE_INCLUDE_DIRECTORIES)
 
 check_prototype_definition(EFIKA_apss_bruteforce
-  "int EFIKA_apss_bruteforce(EFIKA_val_t const minsim, EFIKA_Matrix const * const M, EFIKA_Matrix * const S)" "0"
+  "int EFIKA_apss_bruteforce(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
   "efika/apss.h" HAS_BRUTEFORCE)
+check_prototype_definition(EFIKA_apss_idxjoin
+  "int EFIKA_apss_idxjoin(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
+  "efika/apss.h" HAS_IDXJOIN)
+check_prototype_definition(EFIKA_apss_allpairs
+  "int EFIKA_apss_allpairs(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
+  "efika/apss.h" HAS_ALLPAIRS)
+check_prototype_definition(EFIKA_apss_mmjoin
+  "int EFIKA_apss_mmjoin(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
+  "efika/apss.h" HAS_MMJOIN)
+check_prototype_definition(EFIKA_apss_l2ap
+  "int EFIKA_apss_l2ap(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
+  "efika/apss.h" HAS_L2AP)
 check_prototype_definition(EFIKA_apss_sfrkd
-  "int EFIKA_apss_sfrkd(EFIKA_val_t const minsim, EFIKA_Matrix const * const M, EFIKA_Matrix const * const I, Vector * const A)" "0"
+  "int EFIKA_apss_sfrkd(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
   "efika/apss.h" HAS_SFRKD)
 
-if(NOT HAS_BRUTEFORCE)
+if(NOT HAS_BRUTEFORCE AND NOT HAS_IDXJOIN)
   message(FATAL_ERROR "There is no baseline implementation available. The Celero benchmark framework being used requires a baseline. As such, this build will not complete until until a suitable baseline function prototype is available.")
 endif()
 
@@ -27,9 +39,11 @@ target_sources(${PROJECT_NAME}
   PRIVATE bench_apss.cc)
 
 target_compile_definitions(${PROJECT_NAME}
-  PRIVATE $<${HAS_SFR0D}:HAS_BRUTEFORCE> $<${HAS_SFRKD}:HAS_SFRKD>)
+  PRIVATE $<${HAS_BRUTEFORCE}:HAS_BRUTEFORCE> $<${HAS_IDXJOIN}:HAS_IDXJOIN>
+          $<${HAS_ALLPAIRS}:HAS_ALLPAIRS> $<${HAS_MMJOIN}:HAS_MMJOIN>
+          $<${HAS_L2AP}:HAS_L2AP> $<${HAS_SFRKD}:HAS_SFRKD>)
 
 target_link_libraries(${PROJECT_NAME}
-  PRIVATE Celero::celero Efika::data Efika::efika)
+  PRIVATE Celero::celero Efika::efika)
 
 add_library(EfikaPerf::apss ALIAS ${PROJECT_NAME})

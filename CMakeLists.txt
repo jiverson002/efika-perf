@@ -26,12 +26,6 @@ target_sources(${PROJECT_NAME} PRIVATE src/bench_main.cc)
 # Celero::celero
 find_package(Celero CONFIG REQUIRED)
 
-# Efika::data
-FetchContent_Declare(efika-data
-  GIT_REPOSITORY git@github.com:jiverson002/efika-data.git)
-
-FetchContent_MakeAvailable(efika-data)
-
 # Efika::efika
 find_package(Efika CONFIG REQUIRED)
 
