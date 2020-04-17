@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 #include <cstdlib>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <stdexcept>
+#include <string>
+#include <sstream>
 
 #include "celero/Celero.h"
 
@@ -40,10 +43,22 @@ EFIKA_API(l2ap);
 #ifdef HAS_MMJOIN
 EFIKA_API(mmjoin);
 #endif
+#ifdef HAS_NOVA
+EFIKA_API(nova);
+#endif
 
 } // apss
 
 namespace {
+
+template <class Container>
+void split(const std::string& str, Container& cont, char delim = ',')
+{
+    std::stringstream ss(str);
+    std::string token;
+    while (std::getline(ss, token, delim))
+      cont.push_back(token);
+}
 
 template <typename apss>
 class TestFixture : public celero::TestFixture {
@@ -135,7 +150,7 @@ class TestFixture : public celero::TestFixture {
       EFIKA_Matrix_free(&M_);
     }
 
-    void TestBody() {
+    virtual void UserBenchmark() override {
       apss::run(minsim_, &M_, &S_);
       celero::DoNotOptimizeAway(S_.nnz);
     }
@@ -156,21 +171,74 @@ class TestFixture : public celero::TestFixture {
 
 } // namespace
 
-#if defined(HAS_IDXJOIN)
-BASELINE_F(apss, idxjoin, TestFixture<apss::idxjoin>, 2, 2) { TestBody(); }
-#elif defined(HAS_BRUTEFORCE)
-BASELINE_F(apss, bruteforce, TestFixture<apss::bruteforce>, 2, 2) { TestBody(); }
+void apss_main() {
+  std::map<std::string, std::shared_ptr<::celero::Factory>> baseline_map;
+  std::map<std::string, std::shared_ptr<::celero::Factory>> benchmark_map;
+
+#define REGISTER_TYPE(map, type)\
+  map[#type] = \
+    std::make_shared<::celero::GenericFactory<TestFixture<apss::type>>>();\
+
+#ifdef HAS_BRUTEFORCE
+  REGISTER_TYPE(baseline_map, bruteforce);
+#endif
+#ifdef HAS_IDXJOIN
+  REGISTER_TYPE(baseline_map, idxjoin);
 #endif
 
 #ifdef HAS_ALLPAIRS
-BENCHMARK_F(apss, allpairs, TestFixture<apss::allpairs>, 5, 5) { TestBody(); }
+  REGISTER_TYPE(benchmark_map, allpairs);
 #endif
 #ifdef HAS_L2AP
-BENCHMARK_F(apss, l2ap, TestFixture<apss::l2ap>, 5, 5) { TestBody(); }
+  REGISTER_TYPE(benchmark_map, l2ap);
 #endif
 #ifdef HAS_MMJOIN
-BENCHMARK_F(apss, mmjoin, TestFixture<apss::mmjoin>, 5, 5) { TestBody(); }
+  REGISTER_TYPE(benchmark_map, mmjoin);
 #endif
-#ifdef HAS_SFRKD
-BENCHMARK_F(apss, sfrkd, TestFixture<apss::sfrkd>, 5, 5) { TestBody(); }
+#ifdef HAS_NOVA
+  REGISTER_TYPE(benchmark_map, nova);
 #endif
+
+#ifdef HAS_IDXJOIN
+  if (baseline_map.find("idxjoin") != baseline_map.end()) {
+    ::celero::RegisterBaseline("apss", "idxjoin", 1, 1, 1,
+        baseline_map["idxjoin"]);
+  } else {
+#endif
+#if HAS_BRUTEFORCE
+    ::celero::RegisterBaseline("apss", "bruteforce", 1, 1, 1,
+      baseline_map["bruteforce"]);
+#endif
+  }
+
+  char const * const efika_samples = std::getenv("EFIKA_APSS_SAMPLES");
+  if (!efika_samples)
+    throw std::runtime_error("Environment variable EFIKA_APSS_SAMPLES was not specified");
+
+  char const * const efika_iterations = std::getenv("EFIKA_APSS_ITERATIONS");
+  if (!efika_iterations)
+    throw std::runtime_error("Environment variable EFIKA_APSS_ITERATIONS was not specified");
+
+  std::vector<std::string> algorithm;
+  const char * const efika_algorithm = std::getenv("EFIKA_APSS_ALGORITHM");
+  if (efika_algorithm)
+    split(efika_algorithm, algorithm);
+
+  if (!algorithm.empty()) {
+    for (const auto &name : algorithm) {
+      const auto &iter = benchmark_map.find(name);
+      if (iter != benchmark_map.end()) {
+        ::celero::RegisterTest("apss", iter->first.c_str(),
+            std::atoi(efika_samples), std::atoi(efika_iterations), 1,
+            iter->second);
+      } else {
+        std::cerr << name << " is not implemented" << std::endl;
+      }
+    }
+  } else {
+    for (const auto &[key, val] : benchmark_map)
+      if ("bruteforce" != key)
+        ::celero::RegisterTest("apss", key.c_str(), std::atoi(efika_samples),
+            std::atoi(efika_iterations), 1, val);
+  }
+}

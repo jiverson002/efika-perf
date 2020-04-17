@@ -18,12 +18,15 @@ check_prototype_definition(EFIKA_apss_idxjoin
 check_prototype_definition(EFIKA_apss_allpairs
   "int EFIKA_apss_allpairs(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
   "efika/apss.h" HAS_ALLPAIRS)
-check_prototype_definition(EFIKA_apss_mmjoin
-  "int EFIKA_apss_mmjoin(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
-  "efika/apss.h" HAS_MMJOIN)
 check_prototype_definition(EFIKA_apss_l2ap
   "int EFIKA_apss_l2ap(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
   "efika/apss.h" HAS_L2AP)
+check_prototype_definition(EFIKA_apss_mmjoin
+  "int EFIKA_apss_mmjoin(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
+  "efika/apss.h" HAS_MMJOIN)
+check_prototype_definition(EFIKA_apss_nova
+  "int EFIKA_apss_nova(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
+  "efika/apss.h" HAS_NOVA)
 check_prototype_definition(EFIKA_apss_sfrkd
   "int EFIKA_apss_sfrkd(EFIKA_val_t const minsim, EFIKA_Matrix * const M, EFIKA_Matrix * const S)" "0"
   "efika/apss.h" HAS_SFRKD)
@@ -40,8 +43,9 @@ target_sources(${PROJECT_NAME}
 
 target_compile_definitions(${PROJECT_NAME}
   PRIVATE $<${HAS_BRUTEFORCE}:HAS_BRUTEFORCE> $<${HAS_IDXJOIN}:HAS_IDXJOIN>
-          $<${HAS_ALLPAIRS}:HAS_ALLPAIRS> $<${HAS_MMJOIN}:HAS_MMJOIN>
-          $<${HAS_L2AP}:HAS_L2AP> $<${HAS_SFRKD}:HAS_SFRKD>)
+          $<${HAS_ALLPAIRS}:HAS_ALLPAIRS> $<${HAS_L2AP}:HAS_L2AP>
+          $<${HAS_MMJOIN}:HAS_MMJOIN> $<${HAS_NOVA}:HAS_NOVA>
+          $<${HAS_SFRKD}:HAS_SFRKD>)
 
 target_link_libraries(${PROJECT_NAME}
   PRIVATE Celero::celero Efika::efika)

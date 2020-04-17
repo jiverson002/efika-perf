@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: MIT
 #include "celero/Celero.h"
 
-CELERO_MAIN
+void apss_main();
+
+//CELERO_MAIN
+int main(int argc, char** argv) {
+  apss_main();
+  celero::Run(argc, argv);
+  return 0;
+}
