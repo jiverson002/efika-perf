@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -17,10 +18,10 @@ namespace apss {
 
 #define EFIKA_API(impl)\
   struct impl {\
-    static int pp(EFIKA_val_t const minsim, EFIKA_Matrix * const M) {\
+    int static pp(EFIKA_val_t const minsim, EFIKA_Matrix * const M)\
+    {\
       return EFIKA_apss_ ## impl ## _pp(minsim, M);\
     }\
-\
     int static run(EFIKA_val_t const minsim, EFIKA_Matrix * const M,\
                    EFIKA_Matrix * const S)\
     {\
@@ -97,30 +98,18 @@ class TestFixture : public celero::TestFixture {
       if (!efika_dataset)
         throw std::runtime_error("Environment variable EFIKA_APSS_DATASET was not specified");
       dataset_ = efika_dataset;
+
+      char const * const efika_preprocess = std::getenv("EFIKA_APSS_PREPROCESS");
+      std::transform(efika_preprocess,
+                     efika_preprocess + strlen(efika_preprocess),
+                     std::back_inserter(preprocess_),
+                     ::tolower);
     }
 
     virtual std::vector<std::shared_ptr<celero::UserDefinedMeasurement>>
     getUserDefinedMeasurements() const override {
       return { ncandUDM_, nprunUDM_, nvdotUDM_, nmacs1UDM_, nmacs2UDM_,
                /*nsimsUDM_*/ };
-    }
-
-    virtual void
-    onExperimentStart(const celero::TestFixture::ExperimentValue&) override {
-      int err = EFIKA_Matrix_init(&S_);
-      if (err)
-        throw std::runtime_error("Could not initialize solution matrix");
-    }
-
-    virtual void onExperimentEnd() override {
-      EFIKA_Matrix_free(&S_);
-
-      ncandUDM_->addValue(EFIKA_apss_ncand);
-      nprunUDM_->addValue(EFIKA_apss_nprun);
-      nvdotUDM_->addValue(EFIKA_apss_nvdot);
-      nmacs1UDM_->addValue(EFIKA_apss_nmacs1);
-      nmacs2UDM_->addValue(EFIKA_apss_nmacs2);
-      nsimsUDM_->addValue(EFIKA_apss_nsims);
     }
 
     virtual void
@@ -141,13 +130,27 @@ class TestFixture : public celero::TestFixture {
       if (err)
         throw std::runtime_error("Could not normalize matrix");
 
-      err = apss::pp(minsim_, &M_);
+      if (preprocess_ == "true") {
+        err = apss::pp(minsim_, &M_);
+        if (err)
+          throw std::runtime_error("Could not preprocess matrix");
+      }
+
+      err = EFIKA_Matrix_init(&S_);
       if (err)
-        throw std::runtime_error("Could not preprocess matrix");
+        throw std::runtime_error("Could not initialize solution matrix");
     }
 
     virtual void tearDown() override {
       EFIKA_Matrix_free(&M_);
+      EFIKA_Matrix_free(&S_);
+
+      ncandUDM_->addValue(EFIKA_apss_ncand);
+      nprunUDM_->addValue(EFIKA_apss_nprun);
+      nvdotUDM_->addValue(EFIKA_apss_nvdot);
+      nmacs1UDM_->addValue(EFIKA_apss_nmacs1);
+      nmacs2UDM_->addValue(EFIKA_apss_nmacs2);
+      nsimsUDM_->addValue(EFIKA_apss_nsims);
     }
 
     virtual void UserBenchmark() override {
@@ -158,6 +161,7 @@ class TestFixture : public celero::TestFixture {
   private:
     EFIKA_val_t minsim_;
     char const * dataset_;
+    std::string preprocess_;
     EFIKA_Matrix M_;
     EFIKA_Matrix S_;
 
