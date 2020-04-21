@@ -1,6 +1,7 @@
 [requires]
 celero/2.6.0@jiverson002/development
 efika/0.0.1@jiverson002/unstable
+l2ap/0.2.1@jiverson002/development
 
 [generators]
 cmake_paths

@@ -14,20 +14,61 @@
 #include "efika/core.h"
 #include "efika/io.h"
 
+#ifdef HAS_REF_L2AP
+# include "l2ap/includes.h"
+#endif
+
 namespace apss {
+
+namespace efika {
 
 #define EFIKA_API(impl)\
   struct impl {\
-    int static pp(EFIKA_val_t const minsim, EFIKA_Matrix * const M)\
+    static void set_up(const EFIKA_val_t minsim, const std::string &filename)\
     {\
-      return EFIKA_apss_ ## impl ## _pp(minsim, M);\
+      minsim_ = minsim;\
+      int err = EFIKA_Matrix_init(&M_);\
+      if (err)\
+        throw std::runtime_error("Could not initialize matrix");\
+      err = EFIKA_IO_cluto_load(filename.c_str(), &M_);\
+      if (err)\
+        throw std::runtime_error("Could not load `" + filename + "'");\
+      err = EFIKA_Matrix_comp(&M_);\
+      if (err)\
+        throw std::runtime_error("Could not compact matrix");\
+      err = EFIKA_Matrix_norm(&M_);\
+      if (err)\
+        throw std::runtime_error("Could not normalize matrix");\
+      err = EFIKA_Matrix_init(&S_);\
+      if (err)\
+        throw std::runtime_error("Could not initialize solution matrix");\
     }\
-    int static run(EFIKA_val_t const minsim, EFIKA_Matrix * const M,\
-                   EFIKA_Matrix * const S)\
+    static int pp()\
     {\
-      return EFIKA_apss_ ## impl(minsim, M, S);\
+      return EFIKA_apss_ ## impl ## _pp(minsim_, &M_);\
     }\
-  }
+    static int run()\
+    {\
+      return EFIKA_apss_ ## impl(minsim_, &M_, &S_);\
+    }\
+    static void tear_down()\
+    {\
+      EFIKA_Matrix_free(&M_);\
+      EFIKA_Matrix_free(&S_);\
+    }\
+    static EFIKA_ind_t ncand()  { return EFIKA_apss_ncand;  }\
+    static EFIKA_ind_t nmacs1() { return EFIKA_apss_nmacs1; }\
+    static EFIKA_ind_t nmacs2() { return EFIKA_apss_nmacs2; }\
+    static EFIKA_ind_t nprun()  { return EFIKA_apss_nprun;  }\
+    static EFIKA_ind_t nvdot()  { return EFIKA_apss_nvdot;  }\
+    private:\
+    static EFIKA_val_t minsim_;\
+    static EFIKA_Matrix M_;\
+    static EFIKA_Matrix S_;\
+  };\
+  EFIKA_val_t  impl::minsim_;\
+  EFIKA_Matrix impl::M_;\
+  EFIKA_Matrix impl::S_
 
 #ifdef HAS_ALLPAIRS
 EFIKA_API(allpairs);
@@ -47,6 +88,41 @@ EFIKA_API(mmjoin);
 #ifdef HAS_NOVA
 EFIKA_API(nova);
 #endif
+
+} // efika
+
+namespace ref {
+
+#define REF_API(PROJ)\
+  struct PROJ {\
+    static void set_up(const EFIKA_val_t minsim, const std::string &filename)\
+    {\
+      ::PROJ ## _set_up(minsim, filename.c_str());\
+    }\
+    static int pp()\
+    {\
+      return ::PROJ ## _pp();\
+    }\
+    static int run()\
+    {\
+      return ::PROJ();\
+    }\
+    static void tear_down()\
+    {\
+      ::PROJ ## _tear_down();\
+    }\
+    static EFIKA_ind_t ncand()  { return ::PROJ ## _ncand;  }\
+    static EFIKA_ind_t nmacs1() { return ::PROJ ## _nmacs1; }\
+    static EFIKA_ind_t nmacs2() { return ::PROJ ## _nmacs2; }\
+    static EFIKA_ind_t nprun()  { return ::PROJ ## _nprun;  }\
+    static EFIKA_ind_t nvdot()  { return ::PROJ ## _nvdot;  }\
+  }
+
+#ifdef HAS_REF_L2AP
+REF_API(L2AP);
+#endif
+
+} // ref
 
 } // apss
 
@@ -68,10 +144,7 @@ class TestFixture : public celero::TestFixture {
       public:
         CounterUDM(std::string &&name) : name_(name) { }
 
-        virtual std::string getName() const override
-        {
-          return name_;
-        }
+        virtual std::string getName() const override { return name_; }
 
         // Optionally turn off some statistical reporting.
         virtual bool reportMean()              const override { return false; }
@@ -88,161 +161,139 @@ class TestFixture : public celero::TestFixture {
     };
 
   public:
-    TestFixture() {
-      char const * const efika_minsim = std::getenv("EFIKA_APSS_MINSIM");
-      if (!efika_minsim)
-        throw std::runtime_error("Environment variable EFIKA_APSS_MINSIM was not specified");
-      minsim_ = std::strtod(efika_minsim, nullptr);
-
-      char const * const efika_dataset = std::getenv("EFIKA_APSS_DATASET");
-      if (!efika_dataset)
-        throw std::runtime_error("Environment variable EFIKA_APSS_DATASET was not specified");
-      dataset_ = efika_dataset;
-
-      char const * const efika_preprocess = std::getenv("EFIKA_APSS_PREPROCESS");
-      std::transform(efika_preprocess,
-                     efika_preprocess + strlen(efika_preprocess),
-                     std::back_inserter(preprocess_),
-                     ::tolower);
-    }
-
     virtual std::vector<std::shared_ptr<celero::UserDefinedMeasurement>>
     getUserDefinedMeasurements() const override {
-      return { ncandUDM_, nprunUDM_, nvdotUDM_, nmacs1UDM_, nmacs2UDM_,
-               /*nsimsUDM_*/ };
+      return { ncandUDM_, nprunUDM_, nvdotUDM_, nmacs1UDM_, nmacs2UDM_ };
     }
 
     virtual void
     setUp(const celero::TestFixture::ExperimentValue&) override {
-      int err = EFIKA_Matrix_init(&M_);
-      if (err)
-        throw std::runtime_error("Could not initialize matrix");
+      char const * const env_minsim = std::getenv("EFIKA_APSS_MINSIM");
+      if (!env_minsim)
+        throw std::runtime_error("Environment variable EFIKA_APSS_MINSIM was not specified");
+      auto const minsim = std::strtod(env_minsim, nullptr);
 
-      err = EFIKA_IO_cluto_load(dataset_, &M_);
-      if (err)
-        throw std::runtime_error("Could not load `" + std::string(dataset_) + "'");
+      char const * const env_dataset = std::getenv("EFIKA_APSS_DATASET");
+      if (!env_dataset)
+        throw std::runtime_error("Environment variable EFIKA_APSS_DATASET was not specified");
+      auto const dataset = env_dataset;
 
-      err = EFIKA_Matrix_comp(&M_);
-      if (err)
-        throw std::runtime_error("Could not compact matrix");
+      char const * const env_preprocess = std::getenv("EFIKA_APSS_PREPROCESS");
+      std::string preprocess;
+      if (env_preprocess)
+        std::transform(env_preprocess,
+                       env_preprocess + strlen(env_preprocess),
+                       std::back_inserter(preprocess),
+                       ::tolower);
 
-      err = EFIKA_Matrix_norm(&M_);
-      if (err)
-        throw std::runtime_error("Could not normalize matrix");
+      apss::set_up(minsim, dataset);
 
-      if (preprocess_ == "true") {
-        err = apss::pp(minsim_, &M_);
+      if (preprocess == "true") {
+        int err = apss::pp();
         if (err)
           throw std::runtime_error("Could not preprocess matrix");
       }
-
-      err = EFIKA_Matrix_init(&S_);
-      if (err)
-        throw std::runtime_error("Could not initialize solution matrix");
     }
 
     virtual void tearDown() override {
-      EFIKA_Matrix_free(&M_);
-      EFIKA_Matrix_free(&S_);
+      apss::tear_down();
 
-      ncandUDM_->addValue(EFIKA_apss_ncand);
-      nprunUDM_->addValue(EFIKA_apss_nprun);
-      nvdotUDM_->addValue(EFIKA_apss_nvdot);
-      nmacs1UDM_->addValue(EFIKA_apss_nmacs1);
-      nmacs2UDM_->addValue(EFIKA_apss_nmacs2);
-      nsimsUDM_->addValue(EFIKA_apss_nsims);
+      ncandUDM_->addValue(apss::ncand());
+      nprunUDM_->addValue(apss::nprun());
+      nvdotUDM_->addValue(apss::nvdot());
+      nmacs1UDM_->addValue(apss::nmacs1());
+      nmacs2UDM_->addValue(apss::nmacs2());
     }
 
     virtual void UserBenchmark() override {
-      apss::run(minsim_, &M_, &S_);
-      celero::DoNotOptimizeAway(S_.nnz);
+      apss::run();
     }
 
   private:
-    EFIKA_val_t minsim_;
-    char const * dataset_;
-    std::string preprocess_;
-    EFIKA_Matrix M_;
-    EFIKA_Matrix S_;
-
     std::shared_ptr<CounterUDM> ncandUDM_  { new CounterUDM("ncand")  };
     std::shared_ptr<CounterUDM> nprunUDM_  { new CounterUDM("nprun")  };
     std::shared_ptr<CounterUDM> nvdotUDM_  { new CounterUDM("nvdot")  };
     std::shared_ptr<CounterUDM> nmacs1UDM_ { new CounterUDM("nmacs1") };
     std::shared_ptr<CounterUDM> nmacs2UDM_ { new CounterUDM("nmacs2") };
-    std::shared_ptr<CounterUDM> nsimsUDM_  { new CounterUDM("nsims")  };
 };
 
 } // namespace
 
 void apss_main() {
-  std::map<std::string, std::shared_ptr<::celero::Factory>> baseline_map;
-  std::map<std::string, std::shared_ptr<::celero::Factory>> benchmark_map;
+  std::map<std::string, std::shared_ptr<celero::Factory>> baseline_map;
+  std::map<std::string, std::shared_ptr<celero::Factory>> benchmark_map;
+  std::map<std::string, std::shared_ptr<celero::Factory>> reference_map;
 
 #define REGISTER_TYPE(map, type)\
   map[#type] = \
-    std::make_shared<::celero::GenericFactory<TestFixture<apss::type>>>();\
+    std::make_shared<celero::GenericFactory<TestFixture<apss::type>>>();\
 
 #ifdef HAS_BRUTEFORCE
-  REGISTER_TYPE(baseline_map, bruteforce);
+  REGISTER_TYPE(baseline_map, efika::bruteforce);
 #endif
 #ifdef HAS_IDXJOIN
-  REGISTER_TYPE(baseline_map, idxjoin);
+  REGISTER_TYPE(baseline_map, efika::idxjoin);
 #endif
 
 #ifdef HAS_ALLPAIRS
-  REGISTER_TYPE(benchmark_map, allpairs);
+  REGISTER_TYPE(benchmark_map, efika::allpairs);
 #endif
 #ifdef HAS_L2AP
-  REGISTER_TYPE(benchmark_map, l2ap);
+  REGISTER_TYPE(benchmark_map, efika::l2ap);
 #endif
 #ifdef HAS_MMJOIN
-  REGISTER_TYPE(benchmark_map, mmjoin);
+  REGISTER_TYPE(benchmark_map, efika::mmjoin);
 #endif
 #ifdef HAS_NOVA
-  REGISTER_TYPE(benchmark_map, nova);
+  REGISTER_TYPE(benchmark_map, efika::nova);
 #endif
 
-#ifdef HAS_IDXJOIN
-  if (baseline_map.find("idxjoin") != baseline_map.end()) {
-    ::celero::RegisterBaseline("apss", "idxjoin", 1, 1, 1,
-        baseline_map["idxjoin"]);
+#ifdef HAS_REF_L2AP
+REGISTER_TYPE(reference_map, ref::L2AP);
+#endif
+
+  if (baseline_map.find("efika::idxjoin") != baseline_map.end()) {
+    celero::RegisterBaseline("apss", "efika::idxjoin", 1, 1, 1,
+      baseline_map["efika::idxjoin"]);
   } else {
-#endif
-#if HAS_BRUTEFORCE
-    ::celero::RegisterBaseline("apss", "bruteforce", 1, 1, 1,
-      baseline_map["bruteforce"]);
-#endif
+    celero::RegisterBaseline("apss", "efika::bruteforce", 1, 1, 1,
+      baseline_map["efika::bruteforce"]);
   }
 
-  char const * const efika_samples = std::getenv("EFIKA_APSS_SAMPLES");
-  if (!efika_samples)
+  char const * const env_samples = std::getenv("EFIKA_APSS_SAMPLES");
+  if (!env_samples)
     throw std::runtime_error("Environment variable EFIKA_APSS_SAMPLES was not specified");
 
-  char const * const efika_iterations = std::getenv("EFIKA_APSS_ITERATIONS");
-  if (!efika_iterations)
+  char const * const env_iterations = std::getenv("EFIKA_APSS_ITERATIONS");
+  if (!env_iterations)
     throw std::runtime_error("Environment variable EFIKA_APSS_ITERATIONS was not specified");
 
-  std::vector<std::string> algorithm;
-  const char * const efika_algorithm = std::getenv("EFIKA_APSS_ALGORITHM");
-  if (efika_algorithm)
-    split(efika_algorithm, algorithm);
+  /* register reference implementations */
+  for (const auto &[key, val] : reference_map)
+    celero::RegisterTest("apss", key.c_str(), std::atoi(env_samples),
+      std::atoi(env_iterations), 1, val);
 
+  /* check for benchmark implementation selections */
+  std::vector<std::string> algorithm;
+  const char * const env_algorithm = std::getenv("EFIKA_APSS_ALGORITHM");
+  if (env_algorithm)
+    split(env_algorithm, algorithm);
+
+  /* register benchmark implementations */
   if (!algorithm.empty()) {
     for (const auto &name : algorithm) {
-      const auto &iter = benchmark_map.find(name);
+      const auto &iter = benchmark_map.find(std::string("efika::") + name);
       if (iter != benchmark_map.end()) {
-        ::celero::RegisterTest("apss", iter->first.c_str(),
-            std::atoi(efika_samples), std::atoi(efika_iterations), 1,
-            iter->second);
+        celero::RegisterTest("apss", iter->first.c_str(),
+          std::atoi(env_samples), std::atoi(env_iterations), 1,
+          iter->second);
       } else {
         std::cerr << name << " is not implemented" << std::endl;
       }
     }
   } else {
     for (const auto &[key, val] : benchmark_map)
-      if ("bruteforce" != key)
-        ::celero::RegisterTest("apss", key.c_str(), std::atoi(efika_samples),
-            std::atoi(efika_iterations), 1, val);
+      celero::RegisterTest("apss", key.c_str(), std::atoi(env_samples),
+        std::atoi(env_iterations), 1, val);
   }
 }
