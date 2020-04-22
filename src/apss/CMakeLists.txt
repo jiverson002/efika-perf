@@ -63,13 +63,8 @@ add_library(EfikaPerf::apss ALIAS ${PROJECT_NAME})
 find_package(L2AP CONFIG)
 
 if(L2AP_FOUND)
-  get_target_property(L2AP_REQUIRED_INCLUDES
+  get_target_property(CMAKE_REQUIRED_INCLUDES
     L2AP::l2ap INTERFACE_INCLUDE_DIRECTORIES)
-  get_target_property(OPENMP_REQUIRED_INCLUDES
-    OpenMP::OpenMP_C INTERFACE_INCLUDE_DIRECTORIES)
-  list(APPEND CMAKE_REQUIRED_INCLUDES
-    ${L2AP_REQUIRED_INCLUDES}
-    ${OPENMP_REQUIRED_INCLUDES})
 
   check_prototype_definition(L2AP
     "int L2AP(void)" "0"
