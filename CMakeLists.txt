@@ -3,16 +3,6 @@ cmake_minimum_required(VERSION 3.14)
 # Subproject of efika
 project(efika-perf)
 
-# Include build configurations (compiler standards, options, etc.)
-if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND EFIKA_BUILDCONFIG_FILE)
-  foreach(file ${EFIKA_BUILDCONFIG_FILE})
-    include(${file})
-  endforeach()
-endif()
-
-# Include required CMake modules
-include(FetchContent)
-
 #-------------------------------------------------------------------------------
 # EXECUTABLE configuration
 #-------------------------------------------------------------------------------
